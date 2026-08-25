@@ -6,7 +6,9 @@ class AnalysisCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     language: str = Field(..., min_length=1, max_length=20)
     code_path: str = Field(..., min_length=1, max_length=500)
+    project_key: str | None = Field(default=None, max_length=200)
     signature_file_ids: list[int] = Field(..., min_length=1)
+    baseline_id: int | None = Field(default=None, gt=0)
 
 
 class AnalysisTaskDTO(BaseModel):
@@ -14,6 +16,7 @@ class AnalysisTaskDTO(BaseModel):
     name: str
     language: str
     code_path: str
+    project_key: str = ""
     status: str
     error_message: str | None
     created_by: int

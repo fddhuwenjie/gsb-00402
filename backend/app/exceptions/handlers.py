@@ -26,6 +26,11 @@ class UnauthorizedException(BusinessException):
         super().__init__(message, code=401)
 
 
+class ForbiddenException(BusinessException):
+    def __init__(self, message: str = "Forbidden"):
+        super().__init__(message, code=403)
+
+
 def register_exception_handlers(app: FastAPI):
     @app.exception_handler(BusinessException)
     async def business_exception_handler(request: Request, exc: BusinessException):

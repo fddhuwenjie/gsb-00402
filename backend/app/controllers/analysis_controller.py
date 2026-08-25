@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.controllers.deps import get_current_user_id, require_admin, CurrentUser
+from app.controllers.deps import get_current_user, get_current_user_id, require_admin, CurrentUser
 from app.schemas.analysis import AnalysisCreateRequest, AnalysisTaskDTO, AnalysisDetailDTO
 from app.schemas.common import ApiResponse, PageResponse
 from app.services.analysis_service import AnalysisService
@@ -34,12 +34,12 @@ async def list_analyses(
 @router.post("", response_model=ApiResponse[AnalysisDetailDTO])
 async def create_analysis(
     req: AnalysisCreateRequest,
-    user_id: int = Depends(get_current_user_id),
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = AnalysisService(db)
-    result = await service.create_and_run(req, user_id)
-    logger.info("Analysis created by user %d: %s", user_id, req.name)
+    result = await service.create_and_run(req, current_user)
+    logger.info("Analysis created by user %d: %s", current_user.id, req.name)
     return ApiResponse(data=result)
 
 
@@ -48,14 +48,22 @@ async def create_analysis_with_upload(
     name: str = Form(...),
     language: str = Form(...),
     signature_file_ids: str = Form(...),
+    project_key: str = Form(...),
+    baseline_id: int | None = Form(default=None),
     files: List[UploadFile] = File(...),
-    user_id: int = Depends(get_current_user_id),
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     通过上传文件创建分析任务
+
+    上传场景使用一次性临时目录，因此必须显式提供 ``project_key`` 作为稳定的
+    项目标识，以便后续选择基线时能够正确判定是否属于同一项目。
     """
-    # 创建临时目录存放上传的文件
+    project_key = project_key.strip()
+    if not project_key:
+        return ApiResponse(code=400, message="项目标识（project_key）不能为空")
+
     temp_dir = tempfile.mkdtemp(prefix="cbom_scan_")
     
     try:
@@ -78,13 +86,15 @@ async def create_analysis_with_upload(
             name=name,
             language=language,
             code_path=temp_dir,
+            project_key=project_key,
             signature_file_ids=sig_ids,
+            baseline_id=baseline_id,
         )
         
         # 执行分析（允许临时目录）
         service = AnalysisService(db)
-        result = await service.create_and_run(req, user_id, allow_temp=True)
-        logger.info("Analysis created with uploaded files by user %d: %s", user_id, name)
+        result = await service.create_and_run(req, current_user, allow_temp=True)
+        logger.info("Analysis created with uploaded files by user %d: %s", current_user.id, name)
         
         return ApiResponse(data=result)
     

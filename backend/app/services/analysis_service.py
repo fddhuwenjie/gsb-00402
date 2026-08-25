@@ -11,12 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analyzers import get_analyzer
 from app.config import settings
+from app.controllers.deps import CurrentUser
 from app.core.cbom_generator import CBOMGenerator
 from app.core.fuzzy_matcher import FuzzyMatcher
 from app.core.yara_parser import YaraParser
 from app.entities.models import AnalysisTask, AnalysisResult, TaskStatus
 from app.repositories.analysis_repository import AnalysisRepository
 from app.repositories.signature_repository import SignatureRepository
+from app.services.baseline_service import BaselineService
 from app.schemas.analysis import (
     AnalysisCreateRequest,
     AnalysisTaskDTO,
@@ -61,19 +63,24 @@ class AnalysisService:
             raise ValueError(f"代码路径不是目录: {raw_path}")
         return code_path
 
-    async def create_and_run(self, req: AnalysisCreateRequest, user_id: int, allow_temp: bool = False) -> AnalysisDetailDTO:
+    async def create_and_run(self, req: AnalysisCreateRequest, current_user: CurrentUser, allow_temp: bool = False) -> AnalysisDetailDTO:
         sig_files = await self.sig_repo.find_by_ids(req.signature_file_ids)
         if not sig_files:
             raise ValueError("未找到有效的特征文件")
 
         code_path = self._validate_code_path(req.code_path, allow_temp=allow_temp)
 
+        project_key = (req.project_key or str(code_path)).strip()
+        if not project_key:
+            raise ValueError("项目标识（project_key）不能为空")
+
         task = AnalysisTask(
             name=req.name,
             language=req.language.lower(),
             code_path=str(code_path),
+            project_key=project_key,
             status=TaskStatus.PENDING,
-            created_by=user_id,
+            created_by=current_user.id,
         )
         task.signature_files = list(sig_files)
         task = await self.analysis_repo.create(task)
@@ -87,16 +94,33 @@ class AnalysisService:
 
             await self.analysis_repo.update_status(task.id, TaskStatus.COMPLETED)
             await self.db.commit()
-
-            logger.info(
-                "Analysis completed: task=%d, matches=%d, components=%d",
-                task.id, result.total_matches, result.total_components,
-            )
         except Exception as e:
             logger.error("Analysis failed for task %d: %s", task.id, e)
             await self.analysis_repo.update_status(task.id, TaskStatus.FAILED, str(e))
             await self.db.commit()
             raise
+
+        # Auto-generate the baseline diff *after* the analysis has been committed
+        # as COMPLETED. A diff failure (missing baseline, cross-project mismatch,
+        # ownership error...) must NOT roll the task back to FAILED; instead it is
+        # raised as a clear business error so the caller can surface it. The
+        # analysis result itself is already persisted and remains available.
+        diff_record = None
+        if req.baseline_id:
+            self.db.expire_all()
+            fresh_task = await self.analysis_repo.find_by_id(task.id)
+            baseline_service = BaselineService(self.db)
+            diff_record = await baseline_service.maybe_create_diff_for_task(
+                fresh_task, req.baseline_id, current_user
+            )
+            if diff_record:
+                await self.db.commit()
+
+        logger.info(
+            "Analysis completed: task=%d, matches=%d, components=%d, diff=%s",
+            task.id, result.total_matches, result.total_components,
+            diff_record.id if diff_record else None,
+        )
 
         task_id = task.id
         self.db.expire_all()
@@ -167,6 +191,7 @@ class AnalysisService:
                 name=t.name,
                 language=t.language,
                 code_path=t.code_path,
+                project_key=getattr(t, "project_key", "") or "",
                 status=t.status.value,
                 error_message=t.error_message,
                 created_by=t.created_by,
@@ -208,6 +233,7 @@ class AnalysisService:
             name=task.name,
             language=task.language,
             code_path=task.code_path,
+            project_key=getattr(task, "project_key", "") or "",
             status=task.status.value,
             error_message=task.error_message,
             created_by=task.created_by,
