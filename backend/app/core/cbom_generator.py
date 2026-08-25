@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 class CBOMGenerator:
     """Generates CBOM reports from analysis match results."""
 
+    # Algorithm indicators considered weak/deprecated. Shared with the baseline
+    # diff engine so per-asset risk assessment stays consistent with reports.
+    DEPRECATED_INDICATORS = {"des", "md5", "rc4", "md2", "md4", "sha1"}
+
     KNOWN_LIBRARIES = {
         "mbedtls": {"name": "Mbed TLS", "type": "tls_library"},
         "openssl": {"name": "OpenSSL", "type": "tls_library"},
@@ -149,7 +153,7 @@ class CBOMGenerator:
         if total_matches == 0:
             return "none"
 
-        deprecated_indicators = {"des", "md5", "rc4", "md2", "md4", "sha1"}
+        deprecated_indicators = self.DEPRECATED_INDICATORS
         has_deprecated = False
         for comp in components:
             for func in comp.get("functions", []):

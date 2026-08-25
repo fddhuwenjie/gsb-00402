@@ -63,6 +63,10 @@ class AnalysisTask(Base):
     name = Column(String(255), nullable=False)
     language = Column(String(50), nullable=False)
     code_path = Column(String(500), nullable=False)
+    # Stable project identity used for baseline comparison. For uploaded
+    # projects the scan directory is a throwaway temp path, so a caller-supplied
+    # key is persisted here; for on-disk scans it defaults to the code path.
+    project_key = Column(String(255), nullable=False, index=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
     error_message = Column(Text, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -88,3 +92,52 @@ class AnalysisResult(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     task = relationship("AnalysisTask", back_populates="result")
+
+
+class AnalysisBaseline(Base):
+    """A saved analysis snapshot used as the reference point for future diffs."""
+
+    __tablename__ = "analysis_baselines"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    # The completed analysis task whose report is captured as the baseline.
+    task_id = Column(Integer, ForeignKey("analysis_tasks.id", ondelete="CASCADE"), nullable=False)
+    # Snapshot of the identifying project context, so later analyses can be
+    # validated for consistency without depending on the mutable task row.
+    language = Column(String(50), nullable=False)
+    code_path = Column(String(500), nullable=False)
+    # Stable project identity captured from the baseline task; diffs compare by
+    # this key rather than the (possibly temporary) code path.
+    project_key = Column(String(255), nullable=False, index=True)
+    report_json = Column(Text, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    task = relationship("AnalysisTask")
+    creator = relationship("User")
+    diff_reports = relationship(
+        "DiffReport", back_populates="baseline", cascade="all, delete-orphan"
+    )
+
+
+class DiffReport(Base):
+    """A computed difference between a baseline and a later analysis task."""
+
+    __tablename__ = "diff_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    baseline_id = Column(Integer, ForeignKey("analysis_baselines.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(Integer, ForeignKey("analysis_tasks.id", ondelete="CASCADE"), nullable=False)
+    diff_json = Column(Text, nullable=False)
+    total_added = Column(Integer, default=0)
+    total_removed = Column(Integer, default=0)
+    total_changed = Column(Integer, default=0)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    baseline = relationship("AnalysisBaseline", back_populates="diff_reports")
+    task = relationship("AnalysisTask")
+    creator = relationship("User")

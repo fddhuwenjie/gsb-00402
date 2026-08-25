@@ -7,6 +7,9 @@ class AnalysisCreateRequest(BaseModel):
     language: str = Field(..., min_length=1, max_length=20)
     code_path: str = Field(..., min_length=1, max_length=500)
     signature_file_ids: list[int] = Field(..., min_length=1)
+    # Optional stable project identity. Required for uploaded projects (whose
+    # scan directory is temporary); defaults to the code path when omitted.
+    project_key: str | None = Field(default=None, max_length=255)
 
 
 class AnalysisTaskDTO(BaseModel):
@@ -14,6 +17,7 @@ class AnalysisTaskDTO(BaseModel):
     name: str
     language: str
     code_path: str
+    project_key: str
     status: str
     error_message: str | None
     created_by: int

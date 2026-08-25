@@ -91,6 +91,7 @@ export default function AnalysisDetailPage() {
           <Descriptions.Item label="任务名称">{task.name}</Descriptions.Item>
           <Descriptions.Item label="状态"><Tag color={status.color}>{status.text}</Tag></Descriptions.Item>
           <Descriptions.Item label="代码语言"><Tag color="blue">{task.language?.toUpperCase()}</Tag></Descriptions.Item>
+          <Descriptions.Item label="项目标识">{task.project_key}</Descriptions.Item>
           <Descriptions.Item label="代码路径">{task.code_path}</Descriptions.Item>
           <Descriptions.Item label="特征文件">
             {task.signature_file_names?.map((n, i) => <Tag key={i}>{n}</Tag>)}

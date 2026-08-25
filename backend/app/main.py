@@ -14,6 +14,7 @@ from app.exceptions.handlers import register_exception_handlers
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.signature_controller import router as sig_router
 from app.controllers.analysis_controller import router as analysis_router
+from app.controllers.baseline_controller import router as baseline_router
 from app.controllers.dashboard_controller import router as dashboard_router
 from app.controllers.user_controller import router as user_router
 
@@ -85,6 +86,7 @@ register_exception_handlers(app)
 app.include_router(auth_router)
 app.include_router(sig_router)
 app.include_router(analysis_router)
+app.include_router(baseline_router)
 app.include_router(dashboard_router)
 app.include_router(user_router)
 

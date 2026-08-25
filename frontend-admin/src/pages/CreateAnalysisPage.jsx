@@ -65,6 +65,7 @@ export default function CreateAnalysisPage() {
       const formData = new FormData()
       formData.append('name', values.name)
       formData.append('language', values.language)
+      formData.append('project_key', values.project_key.trim())
       formData.append('signature_file_ids', JSON.stringify(values.signature_file_ids))
       
       // 添加所有文件
@@ -87,6 +88,7 @@ export default function CreateAnalysisPage() {
     form.setFieldsValue({
       name: '测试分析任务 - MbedTLS扫描',
       language: 'c',
+      project_key: 'demo-project',
       signature_file_ids: sigFiles.length > 0 ? [sigFiles[0].id] : [],
     })
     
@@ -135,6 +137,15 @@ export default function CreateAnalysisPage() {
 
             <Form.Item name="language" label="开发语言" rules={[{ required: true, message: '请选择语言' }]}>
               <Select options={LANGUAGES} placeholder="选择代码语言类型" />
+            </Form.Item>
+
+            <Form.Item
+              name="project_key"
+              label="项目标识"
+              rules={[{ required: true, message: '请输入项目标识' }]}
+              extra="用于识别同一项目：对同一项目的多次上传请使用相同标识，才能与已有基线比较"
+            >
+              <Input placeholder="例如：my-service 或 project-a（同一项目需保持一致）" maxLength={255} />
             </Form.Item>
 
             <Form.Item
