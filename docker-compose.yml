@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cbom-db
+    restart: unless-stopped
+    env_file: .env.docker
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cbom_user -d cbom_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cbom-backend
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      CORS_ORIGINS: "http://localhost:8081"
+      UPLOAD_DIR: /app/uploads
+      CODE_SCAN_DIR: /app/scans
+      DEBUG: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
+      - scans:/app/scans
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    container_name: cbom-frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:
+  scans:

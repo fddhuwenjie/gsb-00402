@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.env
+!.env.docker
+!.env.example
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.tox/
+
+# Node.js / Frontend
+node_modules/
+frontend-admin/dist/
+frontend-admin/.vite/
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+# Uploads & Scans (runtime data)
+backend/uploads/
+backend/scans/
+
+# Logs
+*.log
+logs/
+
+# Database
+*.sqlite3
+*.db
+
+# OS
+Thumbs.db
+.DS_Store
