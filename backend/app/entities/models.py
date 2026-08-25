@@ -88,3 +88,44 @@ class AnalysisResult(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     task = relationship("AnalysisTask", back_populates="result")
+
+
+class Baseline(Base):
+    """A saved crypto-asset snapshot of a completed analysis, used as the comparison baseline."""
+    __tablename__ = "baselines"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    task_id = Column(Integer, ForeignKey("analysis_tasks.id", ondelete="CASCADE"), nullable=False)
+    language = Column(String(50), nullable=False)
+    snapshot_json = Column(Text, nullable=False)
+    total_assets = Column(Integer, default=0)
+    risk_level = Column(String(20), default="none")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    task = relationship("AnalysisTask")
+    creator = relationship("User")
+    diff_reports = relationship("DiffReport", back_populates="baseline", cascade="all, delete-orphan")
+
+
+class DiffReport(Base):
+    """A persisted diff result between a baseline and a later analysis of the same project."""
+    __tablename__ = "diff_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    baseline_id = Column(Integer, ForeignKey("baselines.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(Integer, ForeignKey("analysis_tasks.id", ondelete="CASCADE"), nullable=False)
+    diff_json = Column(Text, nullable=False)
+    added_count = Column(Integer, default=0)
+    removed_count = Column(Integer, default=0)
+    changed_count = Column(Integer, default=0)
+    risk_level = Column(String(20), default="none")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    baseline = relationship("Baseline", back_populates="diff_reports")
+    task = relationship("AnalysisTask")
+    creator = relationship("User")

@@ -67,6 +67,20 @@ export const analysisApi = {
   delete: (id) => client.delete(`/analyses/${id}`),
 }
 
+export const baselineApi = {
+  list: (page = 1, pageSize = 20) => client.get('/baselines', { params: { page, page_size: pageSize } }),
+  get: (id) => client.get(`/baselines/${id}`),
+  create: (data) => client.post('/baselines', data),
+  delete: (id) => client.delete(`/baselines/${id}`),
+}
+
+export const diffApi = {
+  list: (page = 1, pageSize = 20) => client.get('/diffs', { params: { page, page_size: pageSize } }),
+  get: (id) => client.get(`/diffs/${id}`),
+  create: (data) => client.post('/diffs', data),
+  delete: (id) => client.delete(`/diffs/${id}`),
+}
+
 export const dashboardApi = {
   stats: () => client.get('/dashboard/stats'),
 }
