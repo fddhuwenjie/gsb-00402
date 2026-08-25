@@ -7,6 +7,8 @@ import SignatureDetailPage from './pages/SignatureDetailPage'
 import AnalysesPage from './pages/AnalysesPage'
 import AnalysisDetailPage from './pages/AnalysisDetailPage'
 import CreateAnalysisPage from './pages/CreateAnalysisPage'
+import BaselinesPage from './pages/BaselinesPage'
+import BaselineDetailPage from './pages/BaselineDetailPage'
 import UsersPage from './pages/UsersPage'
 
 function PrivateRoute({ children }) {
@@ -32,6 +34,9 @@ export default function App() {
                   <Route path="/analyses" element={<AnalysesPage />} />
                   <Route path="/analyses/new" element={<CreateAnalysisPage />} />
                   <Route path="/analyses/:id" element={<AnalysisDetailPage />} />
+                  <Route path="/baselines" element={<BaselinesPage />} />
+                  <Route path="/baselines/:id" element={<BaselineDetailPage />} />
+                  <Route path="/baselines/:id/diffs/:diffId" element={<BaselineDetailPage />} />
                   <Route path="/users" element={<UsersPage />} />
                 </Routes>
               </AdminLayout>

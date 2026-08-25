@@ -68,10 +68,16 @@ class AnalysisService:
 
         code_path = self._validate_code_path(req.code_path, allow_temp=allow_temp)
 
+        # Project identity for baseline comparison. Uploaded projects supply a
+        # stable key (their temp dir changes each upload); on-disk scans fall
+        # back to the resolved code path.
+        project_key = (req.project_key or "").strip() or str(code_path)
+
         task = AnalysisTask(
             name=req.name,
             language=req.language.lower(),
             code_path=str(code_path),
+            project_key=project_key,
             status=TaskStatus.PENDING,
             created_by=user_id,
         )
@@ -167,6 +173,7 @@ class AnalysisService:
                 name=t.name,
                 language=t.language,
                 code_path=t.code_path,
+                project_key=t.project_key,
                 status=t.status.value,
                 error_message=t.error_message,
                 created_by=t.created_by,
@@ -208,6 +215,7 @@ class AnalysisService:
             name=task.name,
             language=task.language,
             code_path=task.code_path,
+            project_key=task.project_key,
             status=task.status.value,
             error_message=task.error_message,
             created_by=task.created_by,

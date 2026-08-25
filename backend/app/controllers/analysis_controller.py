@@ -48,6 +48,7 @@ async def create_analysis_with_upload(
     name: str = Form(...),
     language: str = Form(...),
     signature_file_ids: str = Form(...),
+    project_key: str = Form(...),
     files: List[UploadFile] = File(...),
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -79,6 +80,7 @@ async def create_analysis_with_upload(
             language=language,
             code_path=temp_dir,
             signature_file_ids=sig_ids,
+            project_key=project_key,
         )
         
         # 执行分析（允许临时目录）

@@ -71,6 +71,17 @@ export const dashboardApi = {
   stats: () => client.get('/dashboard/stats'),
 }
 
+export const baselineApi = {
+  list: (page = 1, pageSize = 20) => client.get('/baselines', { params: { page, page_size: pageSize } }),
+  get: (id) => client.get(`/baselines/${id}`),
+  create: (data) => client.post('/baselines', data),
+  delete: (id) => client.delete(`/baselines/${id}`),
+  listDiffs: (id) => client.get(`/baselines/${id}/diffs`),
+  generateDiff: (id, data) => client.post(`/baselines/${id}/diffs`, data),
+  getDiff: (diffId) => client.get(`/baselines/diffs/${diffId}`),
+  getDiffReport: (diffId) => client.get(`/baselines/diffs/${diffId}/report`),
+}
+
 export const userApi = {
   list: (page = 1, pageSize = 20) => client.get('/users', { params: { page, page_size: pageSize } }),
   create: (data) => client.post('/users', data),
