@@ -1,9 +1,9 @@
-import { Descriptions, Spin, Tag, Collapse, Table, Button, Empty, Tooltip, message } from 'antd'
-import { ArrowLeftOutlined, DownloadOutlined, CopyOutlined } from '@ant-design/icons'
+import { Descriptions, Spin, Tag, Collapse, Table, Button, Empty, Tooltip, message, Modal, Form, Input } from 'antd'
+import { ArrowLeftOutlined, DownloadOutlined, CopyOutlined, FlagOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { analysisApi } from '../api/client'
+import { analysisApi, baselineApi } from '../api/client'
 
 const statusMap = {
   pending: { color: 'default', text: '等待中' },
@@ -22,6 +22,9 @@ export default function AnalysisDetailPage() {
   const [detail, setDetail] = useState(null)
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [baselineModalOpen, setBaselineModalOpen] = useState(false)
+  const [baselineSaving, setBaselineSaving] = useState(false)
+  const [baselineForm] = Form.useForm()
 
   useEffect(() => {
     Promise.all([
@@ -46,6 +49,28 @@ export default function AnalysisDetailPage() {
     if (!report) return
     navigator.clipboard.writeText(JSON.stringify(report, null, 2))
     message.success('JSON已复制到剪贴板')
+  }
+
+  const openBaselineModal = () => {
+    baselineForm.setFieldsValue({ name: `${detail.task?.name || '分析'}-基线`, description: '' })
+    setBaselineModalOpen(true)
+  }
+
+  const handleSaveBaseline = async () => {
+    const values = await baselineForm.validateFields()
+    setBaselineSaving(true)
+    try {
+      const res = await baselineApi.create({
+        name: values.name,
+        description: values.description || '',
+        task_id: Number(id),
+      })
+      message.success('基线保存成功')
+      setBaselineModalOpen(false)
+      navigate(`/baselines/${res.data.id}`)
+    } finally {
+      setBaselineSaving(false)
+    }
   }
 
   if (loading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
@@ -80,6 +105,7 @@ export default function AnalysisDetailPage() {
         <h2>分析详情</h2>
         {report && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <Button icon={<FlagOutlined />} onClick={openBaselineModal}>保存为基线</Button>
             <Button icon={<CopyOutlined />} onClick={handleCopyJSON}>复制JSON</Button>
             <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>下载报告</Button>
           </div>
@@ -168,6 +194,25 @@ export default function AnalysisDetailPage() {
           </div>
         )
       )}
+
+      <Modal
+        title="保存为分析基线"
+        open={baselineModalOpen}
+        onOk={handleSaveBaseline}
+        confirmLoading={baselineSaving}
+        onCancel={() => setBaselineModalOpen(false)}
+        okText="保存基线"
+        cancelText="取消"
+      >
+        <Form form={baselineForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="基线名称" rules={[{ required: true, message: '请输入基线名称' }]}>
+            <Input placeholder="例如：v1.0 发布基线" maxLength={200} />
+          </Form.Item>
+          <Form.Item name="description" label="描述">
+            <Input.TextArea rows={3} placeholder="可选说明" maxLength={1000} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
