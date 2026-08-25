@@ -1,9 +1,9 @@
-import { Descriptions, Spin, Tag, Collapse, Table, Button, Empty, Tooltip, message } from 'antd'
-import { ArrowLeftOutlined, DownloadOutlined, CopyOutlined } from '@ant-design/icons'
+import { Descriptions, Spin, Tag, Collapse, Table, Button, Empty, Tooltip, message, Modal, Input, Select, Space, Statistic } from 'antd'
+import { ArrowLeftOutlined, DownloadOutlined, CopyOutlined, SaveOutlined, DiffOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { analysisApi } from '../api/client'
+import { analysisApi, baselineApi, diffApi } from '../api/client'
 
 const statusMap = {
   pending: { color: 'default', text: '等待中' },
@@ -22,13 +22,76 @@ export default function AnalysisDetailPage() {
   const [detail, setDetail] = useState(null)
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [baselineModalOpen, setBaselineModalOpen] = useState(false)
+  const [diffModalOpen, setDiffModalOpen] = useState(false)
+  const [baselineName, setBaselineName] = useState('')
+  const [baselineDesc, setBaselineDesc] = useState('')
+  const [savingBaseline, setSavingBaseline] = useState(false)
+  const [baselines, setBaselines] = useState([])
+  const [selectedBaseline, setSelectedBaseline] = useState(null)
+  const [diffs, setDiffs] = useState([])
+  const [creatingDiff, setCreatingDiff] = useState(false)
+
+  const fetchDiffs = async () => {
+    try {
+      const res = await diffApi.list(id)
+      setDiffs(res.data || [])
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     Promise.all([
       analysisApi.get(id).then((res) => setDetail(res.data)),
       analysisApi.getReport(id).then((res) => setReport(res.data)).catch(() => {}),
+      fetchDiffs(),
     ]).finally(() => setLoading(false))
   }, [id])
+
+  const openSaveBaseline = () => {
+    setBaselineName(detail?.task?.name ? `${detail.task.name} - 基线` : `分析 #${id} 基线`)
+    setBaselineDesc('')
+    setBaselineModalOpen(true)
+  }
+
+  const handleSaveBaseline = async () => {
+    if (!baselineName.trim()) {
+      message.warning('请输入基线名称')
+      return
+    }
+    setSavingBaseline(true)
+    try {
+      await baselineApi.create({ name: baselineName, description: baselineDesc, task_id: Number(id) })
+      message.success('基线已保存')
+      setBaselineModalOpen(false)
+    } finally {
+      setSavingBaseline(false)
+    }
+  }
+
+  const openCreateDiff = async () => {
+    setDiffModalOpen(true)
+    setSelectedBaseline(null)
+    try {
+      const res = await baselineApi.list(1, 100)
+      setBaselines(res.data.items || [])
+    } catch { /* ignore */ }
+  }
+
+  const handleCreateDiff = async () => {
+    if (!selectedBaseline) {
+      message.warning('请选择基线')
+      return
+    }
+    setCreatingDiff(true)
+    try {
+      const res = await diffApi.create({ baseline_id: selectedBaseline, task_id: Number(id) })
+      message.success('差异报告已生成')
+      setDiffModalOpen(false)
+      navigate(`/diffs/${res.data.id}`)
+    } finally {
+      setCreatingDiff(false)
+    }
+  }
 
   const handleDownload = () => {
     if (!report) return
@@ -80,6 +143,8 @@ export default function AnalysisDetailPage() {
         <h2>分析详情</h2>
         {report && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <Button icon={<SaveOutlined />} onClick={openSaveBaseline}>保存为基线</Button>
+            <Button icon={<DiffOutlined />} onClick={openCreateDiff}>基线对比</Button>
             <Button icon={<CopyOutlined />} onClick={handleCopyJSON}>复制JSON</Button>
             <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>下载报告</Button>
           </div>
@@ -91,7 +156,8 @@ export default function AnalysisDetailPage() {
           <Descriptions.Item label="任务名称">{task.name}</Descriptions.Item>
           <Descriptions.Item label="状态"><Tag color={status.color}>{status.text}</Tag></Descriptions.Item>
           <Descriptions.Item label="代码语言"><Tag color="blue">{task.language?.toUpperCase()}</Tag></Descriptions.Item>
-          <Descriptions.Item label="代码路径">{task.code_path}</Descriptions.Item>
+          <Descriptions.Item label="项目标识"><code>{task.project_key || '-'}</code></Descriptions.Item>
+          <Descriptions.Item label="代码路径" span={2}>{task.code_path}</Descriptions.Item>
           <Descriptions.Item label="特征文件">
             {task.signature_file_names?.map((n, i) => <Tag key={i}>{n}</Tag>)}
           </Descriptions.Item>
@@ -116,6 +182,55 @@ export default function AnalysisDetailPage() {
             </Descriptions.Item>
             <Descriptions.Item label="扫描耗时">{result.scan_duration?.toFixed(3)} 秒</Descriptions.Item>
           </Descriptions>
+        </div>
+      )}
+
+      {result && (
+        <div className="report-section">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>基线差异报告</h3>
+            <Button size="small" icon={<DiffOutlined />} onClick={openCreateDiff}>选择基线生成差异</Button>
+          </div>
+          {diffs.length > 0 ? (
+            <Table
+              size="small"
+              rowKey="id"
+              pagination={false}
+              dataSource={diffs}
+              columns={[
+                { title: 'ID', dataIndex: 'id', width: 60 },
+                { title: '基线', dataIndex: 'baseline_name', ellipsis: true },
+                {
+                  title: '新增', dataIndex: 'added_count', width: 70, align: 'center',
+                  render: (v) => <Tag color="green">{v}</Tag>,
+                },
+                {
+                  title: '移除', dataIndex: 'removed_count', width: 70, align: 'center',
+                  render: (v) => <Tag color="red">{v}</Tag>,
+                },
+                {
+                  title: '变化', dataIndex: 'changed_count', width: 70, align: 'center',
+                  render: (v) => <Tag color="orange">{v}</Tag>,
+                },
+                {
+                  title: '风险', dataIndex: 'risk_level', width: 80, align: 'center',
+                  render: (v) => <Tag color={riskColors[v]}>{riskLabels[v] || v}</Tag>,
+                },
+                {
+                  title: '生成时间', dataIndex: 'created_at', width: 170,
+                  render: (v) => dayjs(v).format('YYYY-MM-DD HH:mm:ss'),
+                },
+                {
+                  title: '操作', width: 80, align: 'center',
+                  render: (_, r) => (
+                    <Button type="link" size="small" onClick={() => navigate(`/diffs/${r.id}`)}>查看</Button>
+                  ),
+                },
+              ]}
+            />
+          ) : (
+            <Empty description="暂无差异报告，可点击右上角选择基线生成" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          )}
         </div>
       )}
 
@@ -168,6 +283,51 @@ export default function AnalysisDetailPage() {
           </div>
         )
       )}
+
+      <Modal
+        title="保存为基线"
+        open={baselineModalOpen}
+        onOk={handleSaveBaseline}
+        confirmLoading={savingBaseline}
+        onCancel={() => setBaselineModalOpen(false)}
+        okText="保存"
+        cancelText="取消"
+      >
+        <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
+          <Input
+            placeholder="基线名称"
+            value={baselineName}
+            onChange={(e) => setBaselineName(e.target.value)}
+          />
+          <Input.TextArea
+            placeholder="基线说明（可选）"
+            value={baselineDesc}
+            onChange={(e) => setBaselineDesc(e.target.value)}
+            rows={3}
+          />
+        </Space>
+      </Modal>
+
+      <Modal
+        title="选择基线生成差异报告"
+        open={diffModalOpen}
+        onOk={handleCreateDiff}
+        confirmLoading={creatingDiff}
+        onCancel={() => setDiffModalOpen(false)}
+        okText="生成差异"
+        cancelText="取消"
+      >
+        <Select
+          style={{ width: '100%', marginTop: 8 }}
+          placeholder="选择要对比的基线"
+          value={selectedBaseline}
+          onChange={setSelectedBaseline}
+          options={baselines.map((b) => ({
+            label: `${b.name} [${b.language?.toUpperCase()}] · ${b.asset_count} 资产`,
+            value: b.id,
+          }))}
+        />
+      </Modal>
     </div>
   )
 }

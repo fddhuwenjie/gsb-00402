@@ -2,7 +2,7 @@ import { Form, Input, Select, Button, message, Spin, Divider, Upload } from 'ant
 import { ArrowLeftOutlined, ExperimentOutlined, UploadOutlined, InboxOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { signatureApi, analysisApi } from '../api/client'
+import { signatureApi, analysisApi, baselineApi } from '../api/client'
 
 const { Dragger } = Upload
 
@@ -45,17 +45,23 @@ export default function CreateAnalysisPage() {
   const [loading, setLoading] = useState(false)
   const [sigFiles, setSigFiles] = useState([])
   const [sigLoading, setSigLoading] = useState(true)
+  const [baselines, setBaselines] = useState([])
   const [fileList, setFileList] = useState([])
 
   useEffect(() => {
-    signatureApi.list(1, 100)
-      .then((res) => setSigFiles(res.data.items))
-      .finally(() => setSigLoading(false))
+    Promise.all([
+      signatureApi.list(1, 100).then((res) => setSigFiles(res.data.items)),
+      baselineApi.list(1, 100).then((res) => setBaselines(res.data.items)).catch(() => {}),
+    ]).finally(() => setSigLoading(false))
   }, [])
 
   const onFinish = async (values) => {
     if (fileList.length === 0) {
       message.error('请上传代码文件')
+      return
+    }
+    if (!values.project_key || !values.project_key.trim()) {
+      message.error('请输入项目标识')
       return
     }
     
@@ -65,7 +71,11 @@ export default function CreateAnalysisPage() {
       const formData = new FormData()
       formData.append('name', values.name)
       formData.append('language', values.language)
+      formData.append('project_key', values.project_key.trim())
       formData.append('signature_file_ids', JSON.stringify(values.signature_file_ids))
+      if (values.baseline_id) {
+        formData.append('baseline_id', values.baseline_id)
+      }
       
       // 添加所有文件
       fileList.forEach((file) => {
@@ -138,6 +148,15 @@ export default function CreateAnalysisPage() {
             </Form.Item>
 
             <Form.Item
+              name="project_key"
+              label="项目标识"
+              rules={[{ required: true, message: '请输入项目标识' }]}
+              extra="用于标识同一代码项目，跨多次上传保持一致即可与基线对比。选择对比基线后将自动填充。"
+            >
+              <Input placeholder="例如：myapp-v2 或 /opt/projects/myapp" />
+            </Form.Item>
+
+            <Form.Item
               label="代码文件"
               required
               extra="支持上传单个或多个源代码文件（.c, .cpp, .py, .java 等）"
@@ -162,6 +181,29 @@ export default function CreateAnalysisPage() {
                 options={sigFiles.map((s) => ({
                   label: `${s.name} (${s.function_count} 函数)`,
                   value: s.id,
+                }))}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="baseline_id"
+              label="对比基线"
+              extra="可选。选择基线后，分析完成将自动生成新增/移除/变化的密码资产差异报告"
+            >
+              <Select
+                allowClear
+                placeholder="不使用基线（仅做全新分析）"
+                onChange={(val) => {
+                  if (val) {
+                    const b = baselines.find((x) => x.id === val)
+                    if (b && b.project_key) {
+                      form.setFieldsValue({ project_key: b.project_key })
+                    }
+                  }
+                }}
+                options={baselines.map((b) => ({
+                  label: `${b.name} [${b.language?.toUpperCase()}] · ${b.asset_count} 资产`,
+                  value: b.id,
                 }))}
               />
             </Form.Item>

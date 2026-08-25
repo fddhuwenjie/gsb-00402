@@ -7,6 +7,7 @@ import {
   LogoutOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
+  FundOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useMemo } from 'react'
@@ -36,6 +37,7 @@ export default function AdminLayout({ children }) {
       { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
       { key: '/signatures', icon: <FileSearchOutlined />, label: '特征管理' },
       { key: '/analyses', icon: <ExperimentOutlined />, label: '分析任务' },
+      { key: '/baselines', icon: <FundOutlined />, label: '基线管理' },
     ]
     if (isAdmin) {
       items.push({ key: '/users', icon: <TeamOutlined />, label: '用户管理' })

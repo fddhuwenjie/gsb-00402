@@ -16,6 +16,7 @@ from app.controllers.signature_controller import router as sig_router
 from app.controllers.analysis_controller import router as analysis_router
 from app.controllers.dashboard_controller import router as dashboard_router
 from app.controllers.user_controller import router as user_router
+from app.controllers.baseline_controller import baseline_router, diff_router
 
 LOG_LEVEL = logging.DEBUG if settings.DEBUG else logging.INFO
 logging.basicConfig(
@@ -87,6 +88,8 @@ app.include_router(sig_router)
 app.include_router(analysis_router)
 app.include_router(dashboard_router)
 app.include_router(user_router)
+app.include_router(baseline_router)
+app.include_router(diff_router)
 
 
 @app.get("/api/health")
